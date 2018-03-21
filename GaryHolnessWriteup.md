@@ -137,7 +137,7 @@ the original image (lines 345-346).
 
 The resulting performance is pretty good.
 
-![identified lane and lane lines][image 5]
+![identified lane and lane lines][image5]
 
 ---
 
@@ -145,7 +145,7 @@ The resulting performance is pretty good.
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a ![link to my video result](https://www.youtube.com/watch?v=2fRMQcLh4tE)
+[![video result](http://img.youtube.com/vi/2fRMQcLh4tE/0.jpg)](http://www.youtube.com/watch?v=2fRMQcLh4tE "video result")
 
 ---
 
