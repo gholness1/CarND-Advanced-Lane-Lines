@@ -93,4 +93,8 @@ class tracker():
 
         self.center_obs.append(window_centroids)
         # return averaged values of line centers
+
+        # try median instead of average (not used)
+        #return np.median(self.center_obs[-self.smooth_factor:], axis = 0)   
+
         return np.average(self.center_obs[-self.smooth_factor:], axis = 0)   

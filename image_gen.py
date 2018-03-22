@@ -1,4 +1,4 @@
-############################################################################
+###########################################################################
 # Gary Holness
 # gary.holness@gmail.com
 #
@@ -145,11 +145,27 @@ def color_threshold(image, sthresh=(0,255), vthresh=(0,255)):
     v_channel= hsv[:,:,2]
     v_binary= np.zeros_like(v_channel)
     v_binary[ (v_channel >= vthresh[0]) & (v_channel <= vthresh[1])] = 1
+
   
     output = np.zeros_like(s_channel)
     output[ (s_binary ==1) & (v_binary == 1) ] = 1
 
     return output
+
+def white_yellow_threshold(image):
+    hsv= cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
+    lower_y= np.array([20, 60, 60])
+    upper_y= np.array([38,174,250])
+    mask_y= cv2.inRange(hsv,lower_y, upper_y)
+
+    lower_w = np.array([202,202,202])
+    upper_w = np.array([255,255,255])
+    mask_w = cv2.inRange(image, lower_w, upper_w)
+
+    combined_mask = np.zeros_like(mask_y)
+    combined_mask[(mask_y >= 1) | (mask_w >= 1) ] = 1
+    
+    return combined_mask
 
 
 def window_mask(width, height, img_ref, center, level):
@@ -167,23 +183,37 @@ images = glob.glob('./test_images/test*.jpg')
 
 #####
 # Main routine for my lane finding pipeline
+#
+# Note:  I assume the pipleline is called with an RGB image
 ###
 def processing_pipeline(img):
     VISUALIZE_AND_LOG= False
     DEBUG= False
 
     #undistort image
-    imgu= cv2.undistort(img, mtx, dist, None, mtx)
+    img= cv2.undistort(img, mtx, dist, None, mtx)
+
+    if VISUALIZE_AND_LOG:
+       write_name= './test_images/undistorted_original' + str(idx+1) + '.jpg'
+       fig = plt.figure()
+       plt.imshow(img)
+       plt.show(block=False)
+       img1 = cv2.cvtColor(img,cv2.COLOR_RGB2BGR);
+       cv2.imwrite(write_name, img1)
 
 
     #process image and generate binary pixel
     
     preprocessImage = np.zeros_like(img[:,:,0])
-    gradx= abs_sobel_thresh(img, orient='x', thresh=(12,255)) 
-    grady= abs_sobel_thresh(img, orient='y', thresh=(25,255))
-   
-    c_binary = color_threshold(img, sthresh=(100,255), vthresh=(50,255))
-    preprocessImage[ ((gradx == 1) & (grady == 1)) | (c_binary == 1) ] = 255
+    gradx= abs_sobel_thresh(img, orient='x', sobel_kernel=5, thresh=(12,255))  #thres=(12,255)
+    grady= abs_sobel_thresh(img, orient='y', sobel_kernel=5, thresh=(25,255))  #thres=(25,255)
+ 
+    c_binary = color_threshold(img, sthresh=(100,255), vthresh=(50,255)) #sthresh=(100,255)  vthresh=(50,255)
+    wy_binary = white_yellow_threshold(img)
+    mag_binary = mag_thresh(img, sobel_kernel=5, mag_thresh=(100,255))
+
+    #preprocessImage[ ((gradx == 1) & (grady == 1)) | (c_binary == 1) | (wy_binary ==1) ] = 255
+    preprocessImage[ ((gradx == 1) & (grady == 1)) | (c_binary == 1) | (wy_binary ==1) | (mag_binary == 1)] = 255
 
     if VISUALIZE_AND_LOG: 
        write_name = './test_images/tracked_thresholded' + str(idx+1) + '.jpg'
@@ -201,17 +231,30 @@ def processing_pipeline(img):
     height_pct= 0.65    #pct for polygon height (forward facing out into road ahead)
     bottom_trim= 0.935  #pct from top to bottom avoiding car bonnet
 
-    src = np.float32([[img.shape[1]*(.5-mid_width/2),img.shape[0]*height_pct], \
+
+    CALCULATED_SRC_DST= False
+
+    if CALCULATED_SRC_DST:
+       src = np.float32([[img.shape[1]*(.5-mid_width/2),img.shape[0]*height_pct], \
                       [img.shape[1]*(.5+mid_width/2),img.shape[0]*height_pct], \
                       [img.shape[1]*(.5+bottom_width/2),img.shape[0]*bottom_trim], \
                       [img.shape[1]*(.5-bottom_width/2),img.shape[0]*bottom_trim]])
 
-    offset = img_size[0]*.25
+       offset = img_size[0]*.25
 
-    dst = np.float32([[offset, 0], [img_size[0]-offset, 0], \
+       dst = np.float32([[offset, 0], [img_size[0]-offset, 0], \
                       [img_size[0]-offset, img_size[1]], \
                       [offset ,img_size[1]]])
+    else:
+       src = np.float32([[545, 460],
+                    [735, 460],
+                    [1280, 700],
+                    [0, 700]])
 
+       dst = np.float32([[0, 0],
+                     [1280, 0],
+                     [1280, 720],
+                     [0, 720]])
 
     #do the transform
     M = cv2.getPerspectiveTransform(src,dst)
@@ -240,7 +283,7 @@ def processing_pipeline(img):
     window_height = 80
 
     # establish overall class to do tracking
-    curve_centers = tracker(Mywindow_width = window_width, Mywindow_height = window_height, Mymargin = 25, My_ym = 10/720, My_xm = 4/384, Mysmooth_factor = 15)	
+    curve_centers = tracker(Mywindow_width = window_width, Mywindow_height = window_height, Mymargin = 20, My_ym = 10/720, My_xm = 4/384, Mysmooth_factor = 25)   #margin= 25 Mysmooth_factor= 15
 
     window_centroids = curve_centers.find_window_centroids(warped)
 
@@ -373,11 +416,13 @@ def processing_pipeline(img):
        plt.show(block=False)
        result = cv2.cvtColor(result,cv2.COLOR_RGB2BGR);
        cv2.imwrite(write_name, result)
-       plt.pause(5)
+       plt.pause(8)
+       plt.close()
 
     return result
 
 
+GENERATE_VIDEO= True
 
 #####
 # Main processing loop loading images and calling
@@ -392,15 +437,17 @@ for idx, fname in enumerate(images):
 
 from moviepy.editor import VideoFileClip
 
-#video_input= './project_video.mp4'
-#video_input= './challenge_video.mp4'
-video_input= './harder_challenge_video.mp4'
+video_inputs= ['./project_video.mp4'] #, './challenge_video.mp4', './harder_challenge_video.mp4']
+video_outputs= ['./myvideo.mp4']      #, './myvideo_challenge.mp4', './myvideo_harder_challenge.mp4']
 
-#video_output= './myvideo.mp4'
-#video_output= './myvideo_challenge.mp4'
-video_output= './myvideo_harder_challenge.mp4'
+if GENERATE_VIDEO:
+   numVideos= len(video_inputs)
 
-video_clip = VideoFileClip(video_input)
+   for i in range(numVideos):
+     video_input= video_inputs[i]
+     video_output= video_outputs[i]
+   
+     video_clip = VideoFileClip(video_input)
 
-processed_video= video_clip.fl_image(processing_pipeline)
-processed_video.write_videofile(video_output, audio=False)
+     processed_video= video_clip.fl_image(processing_pipeline)
+     processed_video.write_videofile(video_output, audio=False)
