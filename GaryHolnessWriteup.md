@@ -59,7 +59,7 @@ The goals / steps of this project are the following:
 [image5]: ./test_images/road_warped1.jpg "Unwarped road with lanes mapped"
 [image6]: ./camera_cal/calibration1.jpg "original distorted image"
 [image7]: ./camera_cal/calibration1_undist.jpg "calibrated unwarped image"
-[image8]: ./test_images/undistorted_original1.jpg "Original Image1"
+[image8]: ./test_images/undistorted_original1.jpg "undistorted Original Image1"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
